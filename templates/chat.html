@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Чат - SaveVillage{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <!-- Боковая панель с пользователями -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h3>Участники</h3>
+            <span class="online-count" id="onlineCount">0 онлайн</span>
+        </div>
+
+        <div class="users-list" id="usersList">
+            {% for user in users %}
+            <div class="user-item" data-user-id="{{ user.id }}">
+                <div class="user-avatar">
+                    <span class="status-indicator {% if user in online_users %}status-online{% else %}status-offline{% endif %}"
+                          id="status-{{ user.id }}"></span>
+                    {{ user.username[0].upper() }}
+                </div>
+                <div class="user-info">
+                    <span class="user-name">{{ user.username }}</span>
+                    <span class="user-role role-{{ user.role }}">{{ user.role }}</span>
+                </div>
+                {% if current_user.is_moderator() and user.id != current_user.id and not user.is_moderator() %}
+                <div class="user-actions">
+                    {% if user.is_muted %}
+                    <button class="btn-icon btn-unmute" onclick="unmuteUser({{ user.id }})" title="Размутить">
+                        🔊
+                    </button>
+                    {% else %}
+                    <button class="btn-icon btn-mute" onclick="openMuteModal({{ user.id }}, '{{ user.username }}')" title="Замутить">
+                        🔇
+                    </button>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Область чата -->
+    <div class="chat-main">
+        <div class="chat-messages" id="chatMessages">
+            {% for msg in messages %}
+            <div class="message" data-message-id="{{ msg.id }}" data-user-id="{{ msg.user_id }}">
+                <div class="message-avatar">{{ msg.author.username[0].upper() }}</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-author">{{ msg.author.username }}</span>
+                        <span class="message-role role-{{ msg.author.role }}">{{ msg.author.role }}</span>
+                        <span class="message-time">{{ msg.timestamp.strftime('%H:%M') }}</span>
+                    </div>
+                    <div class="message-text">{{ msg.text }}</div>
+                </div>
+                {% if msg.user_id == current_user.id or current_user.is_moderator() %}
+                <button class="message-delete" onclick="deleteMessage({{ msg.id }})">🗑️</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="chat-input-container">
+            {% if current_user.is_muted %}
+            <div class="muted-notice">
+                <span>🔇 Вы замучены и не можете отправлять сообщения</span>
+            </div>
+            {% else %}
+            <form id="messageForm" class="chat-input-form">
+                <input type="text"
+                       id="messageInput"
+                       placeholder="Напишите сообщение..."
+                       autocomplete="off"
+                       maxlength="1000">
+                <button type="submit" class="btn-send">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для мута -->
+<div id="muteModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Замутить пользователя</h3>
+            <button class="modal-close" onclick="closeMuteModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <p>Выберите длительность мута для <strong id="muteUsername"></strong>:</p>
+            <div class="mute-options">
+                <button class="btn btn-mute-option" onclick="muteUser('10m')">10 минут</button>
+                <button class="btn btn-mute-option" onclick="muteUser('1h')">1 час</button>
+                <button class="btn btn-mute-option" onclick="muteUser('forever')">Навсегда</button>
+            </div>
+            <div class="custom-mute">
+                <label>Своё время (минуты):</label>
+                <input type="number" id="customMuteMinutes" min="1" max="10080" placeholder="60">
+                <button class="btn btn-primary" onclick="muteUserCustom()">Применить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}

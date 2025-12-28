@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Админ-панель - SaveVillage{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>⚙️ Панель администратора</h2>
+        <a href="{{ url_for('chat') }}" class="btn btn-secondary">← Вернуться в чат</a>
+    </div>
+
+    <!-- Создание нового пользователя -->
+    <div class="admin-section">
+        <h3>➕ Создать нового пользователя</h3>
+        <form id="createUserForm" class="admin-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="newUsername">Логин</label>
+                    <input type="text" id="newUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">Пароль</label>
+                    <input type="text" id="newPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="newRole">Роль</label>
+                    <select id="newRole">
+                        <option value="user">Пользователь</option>
+                        <option value="moderator">Модератор</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Создать</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Список пользователей -->
+    <div class="admin-section">
+        <h3>👥 Управление пользователями</h3>
+        <div class="users-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Логин</th>
+                        <th>Роль</th>
+                        <th>Статус</th>
+                        <th>Последняя активность</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                    {% for user in users %}
+                    <tr data-user-id="{{ user.id }}">
+                        <td>{{ user.id }}</td>
+                        <td>
+                            <div class="table-user">
+                                <span class="user-avatar-small">{{ user.username[0].upper() }}</span>
+                                {{ user.username }}
+                            </div>
+                        </td>
+                        <td>
+                            {% if user.is_creator() %}
+                            <span class="role-badge role-creator">{{ user.role }}</span>
+                            {% else %}
+                            <select class="role-select" onchange="changeRole({{ user.id }}, this.value)">
+                                <option value="user" {% if user.role == 'user' %}selected{% endif %}>user</option>
+                                <option value="moderator" {% if user.role == 'moderator' %}selected{% endif %}>moderator</option>
+                            </select>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.is_muted %}
+                            <span class="status-badge status-muted">🔇 Мут</span>
+                            {% else %}
+                            <span class="status-badge status-active">✅ Активен</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.last_seen.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td class="table-actions">
+                            {% if not user.is_creator() %}
+                            <button class="btn-icon btn-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}')" title="Удалить">
+                                🗑️
+                            </button>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Статистика -->
+    <div class="admin-section">
+        <h3>📊 Статистика</h3>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-info">
+                    <span class="stat-value">{{ users|length }}</span>
+                    <span class="stat-label">Всего пользователей</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🟢</div>
+                <div class="stat-info">
+                    <span class="stat-value">{{ users|selectattr('last_seen')|list|length }}</span>
+                    <span class="stat-label">Активных</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔇</div>
+                <div class="stat-info">
+                    <span class="stat-value">{{ users|selectattr('is_muted')|list|length }}</span>
+                    <span class="stat-label">Замучено</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}
