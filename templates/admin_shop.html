@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Админка магазина - SaveVillage{% endblock %}
+
+{% block content %}
+<div class="admin-shop-container">
+    <div class="admin-shop-header">
+        <h2>🛒 Управление магазином</h2>
+        <div class="header-actions">
+            <a href="{{ url_for('admin') }}" class="btn btn-secondary">👥 Пользователи</a>
+            <a href="{{ url_for('chat') }}" class="btn btn-secondary">💬 Чат</a>
+        </div>
+    </div>
+
+    <!-- Добавление товара -->
+    <div class="admin-section">
+        <h3>➕ Добавить товар</h3>
+        <form id="addProductForm" class="product-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Название</label>
+                    <input type="text" id="productName" required>
+                </div>
+                <div class="form-group">
+                    <label>Цена (₽)</label>
+                    <input type="number" id="productPrice" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Количество</label>
+                    <input type="number" id="productStock" min="0" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Описание</label>
+                <textarea id="productDescription" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>URL изображения</label>
+                <input type="url" id="productImage" placeholder="https://example.com/image.jpg">
+                <small>Пока вставляй ссылку на картинку. Позже добавим загрузку файлов.</small>
+            </div>
+            <button type="submit" class="btn btn-primary">Добавить товар</button>
+        </form>
+    </div>
+
+    <!-- Список товаров -->
+    <div class="admin-section">
+        <h3>📦 Товары ({{ products|length }})</h3>
+        <div class="products-table">
+            {% if products %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Изображение</th>
+                        <th>Название</th>
+                        <th>Цена</th>
+                        <th>Количество</th>
+                        <th>Создан</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td>{{ product.id }}</td>
+                        <td>
+                            {% if product.image_url %}
+                            <img src="{{ product.image_url }}" class="product-thumb" alt="{{ product.name }}">
+                            {% else %}
+                            <div class="product-thumb-placeholder">📦</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ product.name }}</td>
+                        <td>{{ product.price }} ₽</td>
+                        <td>
+                            <span class="stock-badge {% if product.stock == 0 %}stock-out{% endif %}">
+                                {{ product.stock }}
+                            </span>
+                        </td>
+                        <td>{{ product.created_at.strftime('%d.%m.%Y') }}</td>
+                        <td>
+                            <button class="btn-icon" onclick="editProduct({{ product.id }})" title="Редактировать">✏️</button>
+                            <button class="btn-icon btn-danger" onclick="deleteProduct({{ product.id }}, '{{ product.name }}')" title="Удалить">🗑️</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-message">Товаров пока нет</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Заказы -->
+    <div class="admin-section">
+        <h3>📋 Заказы ({{ orders|length }})</h3>
+        <div class="orders-table">
+            {% if orders %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Покупатель</th>
+                        <th>Сумма</th>
+                        <th>Статус</th>
+                        <th>Контакты</th>
+                        <th>Дата</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>#{{ order.id }}</td>
+                        <td>{{ order.customer.username }}</td>
+                        <td>{{ order.total_price|round(2) }} ₽</td>
+                        <td>
+                            <select class="status-select status-{{ order.status }}"
+                                    onchange="updateOrderStatus({{ order.id }}, this.value)">
+                                <option value="pending" {% if order.status == 'pending' %}selected{% endif %}>⏳ Ожидает</option>
+                                <option value="paid" {% if order.status == 'paid' %}selected{% endif %}>💳 Оплачен</option>
+                                <option value="shipped" {% if order.status == 'shipped' %}selected{% endif %}>🚚 Отправлен</option>
+                                <option value="completed" {% if order.status == 'completed' %}selected{% endif %}>✅ Выполнен</option>
+                                <option value="cancelled" {% if order.status == 'cancelled' %}selected{% endif %}>❌ Отменён</option>
+                            </select>
+                        </td>
+                        <td class="contact-cell">
+                            <div>{{ order.contact_info }}</div>
+                            <small>{{ order.delivery_address[:50] }}...</small>
+                        </td>
+                        <td>{{ order.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>
+                            <button class="btn-icon" onclick="viewOrder({{ order.id }})" title="Просмотр">👁️</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-message">Заказов пока нет</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Добавление товара
+document.getElementById('addProductForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append('name', document.getElementById('productName').value);
+    formData.append('description', document.getElementById('productDescription').value);
+    formData.append('price', document.getElementById('productPrice').value);
+    formData.append('stock', document.getElementById('productStock').value);
+    formData.append('image_url', document.getElementById('productImage').value);
+
+    try {
+        const response = await fetch('/admin/shop/product/create', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showFlash(data.message, 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showFlash(data.message, 'error');
+        }
+    } catch (error) {
+        showFlash('Ошибка при создании товара', 'error');
+    }
+});
+
+// Удаление товара
+async function deleteProduct(productId, productName) {
+    if (!confirm(`Удалить товар "${productName}"?`)) return;
+
+    try {
+        const response = await fetch(`/admin/shop/product/${productId}/delete`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showFlash(data.message, 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showFlash(data.message, 'error');
+        }
+    } catch (error) {
+        showFlash('Ошибка при удалении товара', 'error');
+    }
+}
+
+// Изменение статуса заказа
+async function updateOrderStatus(orderId, status) {
+    try {
+        const response = await fetch(`/admin/shop/order/${orderId}/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showFlash(data.message, 'success');
+        } else {
+            showFlash(data.message, 'error');
+        }
+    } catch (error) {
+        showFlash('Ошибка при обновлении статуса', 'error');
+    }
+}
+
+function showFlash(message, type) {
+    const flashContainer = document.querySelector('.flash-container') || createFlashContainer();
+    const flash = document.createElement('div');
+    flash.className = `flash flash-${type}`;
+    flash.innerHTML = `
+        ${message}
+        <button class="flash-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    flashContainer.appendChild(flash);
+    setTimeout(() => flash.remove(), 3000);
+}
+
+function createFlashContainer() {
+    const container = document.createElement('div');
+    container.className = 'flash-container';
+    document.body.appendChild(container);
+    return container;
+}
+</script>
+
+<style>
+.admin-shop-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.admin-shop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.product-form {
+    max-width: 800px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 1rem;
+}
+
+.product-thumb {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.product-thumb-placeholder {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    font-size: 1.5rem;
+}
+
+.stock-badge {
+    padding: 0.25rem 0.75rem;
+    background: rgba(0, 255, 136, 0.2);
+    color: var(--accent-success);
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.stock-out {
+    background: rgba(255, 0, 85, 0.2);
+    color: var(--accent-danger);
+}
+
+.status-select {
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.status-select.status-pending {
+    background: rgba(255, 170, 0, 0.2);
+    color: var(--accent-warning);
+}
+
+.status-select.status-paid {
+    background: rgba(0, 217, 255, 0.2);
+    color: var(--accent-primary);
+}
+
+.status-select.status-shipped {
+    background: rgba(179, 0, 255, 0.2);
+    color: var(--accent-secondary);
+}
+
+.status-select.status-completed {
+    background: rgba(0, 255, 136, 0.2);
+    color: var(--accent-success);
+}
+
+.status-select.status-cancelled {
+    background: rgba(255, 0, 85, 0.2);
+    color: var(--accent-danger);
+}
+
+.contact-cell {
+    max-width: 200px;
+}
+
+.contact-cell div {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.contact-cell small {
+    color: var(--text-muted);
+    display: block;
+}
+
+.empty-message {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+@media (max-width: 1024px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

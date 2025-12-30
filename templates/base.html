@@ -16,6 +16,11 @@
         <div class="nav-right">
             <span class="username">{{ current_user.username }}</span>
             <span class="role-badge role-{{ current_user.role }}">{{ current_user.role }}</span>
+            <a href="{{ url_for('shop') }}" class="nav-link">🛒 Магазин</a>
+            <a href="{{ url_for('cart') }}" class="nav-link">
+                🛍️ Корзина
+                <span class="cart-badge" id="cartCount">0</span>
+            </a>
             {% if current_user.is_creator() %}
             <a href="{{ url_for('admin') }}" class="nav-link">⚙️ Админка</a>
             {% endif %}

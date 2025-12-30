@@ -27,6 +27,8 @@ class User(UserMixin, db.Model):
     mute_until = db.Column(db.DateTime, nullable=True)
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
     messages = db.relationship('Message', backref='author', lazy=True, cascade='all, delete-orphan')
+    cart_items = db.relationship('CartItem', backref='user', lazy=True, cascade='all, delete-orphan')
+    orders = db.relationship('Order', backref='customer', lazy=True, cascade='all, delete-orphan')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -64,6 +66,55 @@ class Message(db.Model):
             'text': self.text,
             'timestamp': self.timestamp.strftime('%H:%M')
         }
+
+
+class Product(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    price = db.Column(db.Float, nullable=False)
+    image_url = db.Column(db.String(500), nullable=True)
+    stock = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    cart_items = db.relationship('CartItem', backref='product', lazy=True, cascade='all, delete-orphan')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'price': self.price,
+            'image_url': self.image_url,
+            'stock': self.stock
+        }
+
+
+class CartItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    quantity = db.Column(db.Integer, default=1)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Order(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    total_price = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(50), default='pending')  # pending, paid, shipped, completed, cancelled
+    delivery_address = db.Column(db.Text, nullable=False)
+    contact_info = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
+
+
+class OrderItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    product_name = db.Column(db.String(200), nullable=False)
+    product_price = db.Column(db.Float, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    product_image = db.Column(db.String(500), nullable=True)
 
 
 @login_manager.user_loader
@@ -257,6 +308,241 @@ def unmute_user():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+
+# === МАГАЗИН ===
+
+@app.route('/shop')
+@login_required
+def shop():
+    products = Product.query.filter(Product.stock > 0).all()
+    cart_count = CartItem.query.filter_by(user_id=current_user.id).count()
+    return render_template('shop.html', products=products, cart_count=cart_count)
+
+
+@app.route('/shop/product/<int:product_id>')
+@login_required
+def product_detail(product_id):
+    product = Product.query.get_or_404(product_id)
+    cart_count = CartItem.query.filter_by(user_id=current_user.id).count()
+    return render_template('product_detail.html', product=product, cart_count=cart_count)
+
+
+@app.route('/cart')
+@login_required
+def cart():
+    cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
+    total = sum(item.product.price * item.quantity for item in cart_items)
+    return render_template('cart.html', cart_items=cart_items, total=total)
+
+
+@app.route('/cart/add/<int:product_id>', methods=['POST'])
+@login_required
+def add_to_cart(product_id):
+    product = Product.query.get_or_404(product_id)
+    quantity = int(request.json.get('quantity', 1))
+
+    if product.stock < quantity:
+        return jsonify({'success': False, 'message': 'Недостаточно товара на складе'}), 400
+
+    cart_item = CartItem.query.filter_by(user_id=current_user.id, product_id=product_id).first()
+
+    if cart_item:
+        cart_item.quantity += quantity
+    else:
+        cart_item = CartItem(user_id=current_user.id, product_id=product_id, quantity=quantity)
+        db.session.add(cart_item)
+
+    db.session.commit()
+
+    cart_count = CartItem.query.filter_by(user_id=current_user.id).count()
+    return jsonify({'success': True, 'message': 'Товар добавлен в корзину', 'cart_count': cart_count})
+
+
+@app.route('/cart/update/<int:item_id>', methods=['POST'])
+@login_required
+def update_cart(item_id):
+    cart_item = CartItem.query.get_or_404(item_id)
+
+    if cart_item.user_id != current_user.id:
+        return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+
+    quantity = int(request.json.get('quantity', 1))
+
+    if quantity <= 0:
+        db.session.delete(cart_item)
+    elif cart_item.product.stock >= quantity:
+        cart_item.quantity = quantity
+    else:
+        return jsonify({'success': False, 'message': 'Недостаточно товара'}), 400
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/cart/remove/<int:item_id>', methods=['POST'])
+@login_required
+def remove_from_cart(item_id):
+    cart_item = CartItem.query.get_or_404(item_id)
+
+    if cart_item.user_id != current_user.id:
+        return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+
+    db.session.delete(cart_item)
+    db.session.commit()
+
+    return jsonify({'success': True})
+
+
+@app.route('/checkout', methods=['GET', 'POST'])
+@login_required
+def checkout():
+    cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
+
+    if not cart_items:
+        flash('Корзина пуста', 'error')
+        return redirect(url_for('shop'))
+
+    if request.method == 'POST':
+        address = request.form.get('address')
+        contact = request.form.get('contact')
+
+        if not address or not contact:
+            flash('Заполните все поля', 'error')
+            return redirect(url_for('checkout'))
+
+        # Создаем заказ
+        total = sum(item.product.price * item.quantity for item in cart_items)
+        order = Order(
+            user_id=current_user.id,
+            total_price=total,
+            delivery_address=address,
+            contact_info=contact
+        )
+        db.session.add(order)
+        db.session.flush()
+
+        # Добавляем товары в заказ
+        for item in cart_items:
+            order_item = OrderItem(
+                order_id=order.id,
+                product_name=item.product.name,
+                product_price=item.product.price,
+                quantity=item.quantity,
+                product_image=item.product.image_url
+            )
+            db.session.add(order_item)
+
+            # Уменьшаем количество на складе
+            item.product.stock -= item.quantity
+
+        # Очищаем корзину
+        for item in cart_items:
+            db.session.delete(item)
+
+        db.session.commit()
+
+        flash('Заказ успешно оформлен! Мы свяжемся с вами в ближайшее время.', 'success')
+        return redirect(url_for('my_orders'))
+
+    total = sum(item.product.price * item.quantity for item in cart_items)
+    return render_template('checkout.html', cart_items=cart_items, total=total)
+
+
+@app.route('/orders')
+@login_required
+def my_orders():
+    orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
+    return render_template('my_orders.html', orders=orders)
+
+
+# === АДМИНКА МАГАЗИНА ===
+
+@app.route('/admin/shop')
+@login_required
+def admin_shop():
+    if not current_user.is_creator():
+        flash('Доступ запрещен', 'error')
+        return redirect(url_for('shop'))
+
+    products = Product.query.all()
+    orders = Order.query.order_by(Order.created_at.desc()).all()
+    return render_template('admin_shop.html', products=products, orders=orders)
+
+
+@app.route('/admin/shop/product/create', methods=['POST'])
+@login_required
+def create_product():
+    if not current_user.is_creator():
+        return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+
+    name = request.form.get('name')
+    description = request.form.get('description')
+    price = float(request.form.get('price'))
+    stock = int(request.form.get('stock'))
+    image_url = request.form.get('image_url')
+
+    product = Product(
+        name=name,
+        description=description,
+        price=price,
+        stock=stock,
+        image_url=image_url
+    )
+
+    db.session.add(product)
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': 'Товар создан'})
+
+
+@app.route('/admin/shop/product/<int:product_id>/edit', methods=['POST'])
+@login_required
+def edit_product(product_id):
+    if not current_user.is_creator():
+        return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+
+    product = Product.query.get_or_404(product_id)
+
+    product.name = request.json.get('name', product.name)
+    product.description = request.json.get('description', product.description)
+    product.price = float(request.json.get('price', product.price))
+    product.stock = int(request.json.get('stock', product.stock))
+    product.image_url = request.json.get('image_url', product.image_url)
+
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': 'Товар обновлен'})
+
+
+@app.route('/admin/shop/product/<int:product_id>/delete', methods=['POST'])
+@login_required
+def delete_product(product_id):
+    if not current_user.is_creator():
+        return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+
+    product = Product.query.get_or_404(product_id)
+    db.session.delete(product)
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': 'Товар удален'})
+
+
+@app.route('/admin/shop/order/<int:order_id>/status', methods=['POST'])
+@login_required
+def update_order_status(order_id):
+    if not current_user.is_creator():
+        return jsonify({'success': False, 'message': 'Доступ запрещен'}), 403
+
+    order = Order.query.get_or_404(order_id)
+    status = request.json.get('status')
+
+    if status in ['pending', 'paid', 'shipped', 'completed', 'cancelled']:
+        order.status = status
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Статус обновлен'})
+
+    return jsonify({'success': False, 'message': 'Неверный статус'}), 400
 
 
 # WebSocket события

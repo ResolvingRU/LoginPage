@@ -99,6 +99,16 @@ body::before {
     background: rgba(0, 217, 255, 0.1);
 }
 
+.cart-badge {
+    background: var(--accent-danger);
+    color: white;
+    border-radius: 50%;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 0.25rem;
+}
+
 /* Роли */
 .role-badge {
     padding: 0.25rem 0.75rem;

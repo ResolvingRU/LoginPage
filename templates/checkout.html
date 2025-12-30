@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Оформление заказа - SaveVillage{% endblock %}
+
+{% block content %}
+<div class="checkout-container">
+    <div class="checkout-header">
+        <h1>📦 Оформление заказа</h1>
+    </div>
+
+    <div class="checkout-content">
+        <div class="checkout-form-section">
+            <h2>Данные для доставки</h2>
+            <form method="POST" class="checkout-form">
+                <div class="form-group">
+                    <label for="contact">Контактная информация *</label>
+                    <input type="text" id="contact" name="contact"
+                           placeholder="Telegram: @username или телефон" required>
+                    <small>Мы свяжемся с вами для подтверждения заказа</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="address">Адрес доставки *</label>
+                    <textarea id="address" name="address" rows="3"
+                              placeholder="Город, улица, дом, квартира" required></textarea>
+                </div>
+
+                <div class="checkout-items">
+                    <h3>Ваш заказ</h3>
+                    {% for item in cart_items %}
+                    <div class="checkout-item">
+                        <div class="checkout-item-image">
+                            {% if item.product.image_url %}
+                            <img src="{{ item.product.image_url }}" alt="{{ item.product.name }}">
+                            {% else %}
+                            <div class="checkout-item-placeholder">📦</div>
+                            {% endif %}
+                        </div>
+                        <div class="checkout-item-info">
+                            <span class="checkout-item-name">{{ item.product.name }}</span>
+                            <span class="checkout-item-qty">× {{ item.quantity }}</span>
+                        </div>
+                        <span class="checkout-item-price">{{ (item.product.price * item.quantity)|round(2) }} ₽</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="checkout-notice">
+                    <strong>📌 Важно:</strong> После оформления заказа мы свяжемся с вами для подтверждения
+                    и согласования способа оплаты. Оплата после подтверждения заказа.
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-submit">
+                    Оформить заказ на {{ total|round(2) }} ₽
+                </button>
+            </form>
+        </div>
+
+        <div class="checkout-summary">
+            <h2>Итого</h2>
+            <div class="summary-items">
+                <div class="summary-row">
+                    <span>Товары ({{ cart_items|length }})</span>
+                    <span>{{ total|round(2) }} ₽</span>
+                </div>
+                <div class="summary-row">
+                    <span>Доставка</span>
+                    <span class="delivery-info">Уточняется</span>
+                </div>
+            </div>
+            <div class="summary-total">
+                <span>Итого:</span>
+                <span>{{ total|round(2) }} ₽</span>
+            </div>
+            <div class="payment-methods">
+                <h3>Способы оплаты:</h3>
+                <div class="payment-option">💳 Банковская карта</div>
+                <div class="payment-option">₿ Криптовалюта (BTC/USDT/ETH)</div>
+                <div class="payment-option">💸 Наличные при получении</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.checkout-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.checkout-header h1 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.checkout-content {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 2rem;
+}
+
+.checkout-form-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 2rem;
+}
+
+.checkout-form-section h2 {
+    margin-bottom: 1.5rem;
+}
+
+.checkout-form .form-group {
+    margin-bottom: 1.5rem;
+}
+
+.checkout-form label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.checkout-form input,
+.checkout-form textarea {
+    width: 100%;
+}
+
+.checkout-form small {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.checkout-items {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+}
+
+.checkout-items h3 {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.checkout-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.checkout-item:last-child {
+    border-bottom: none;
+}
+
+.checkout-item-image {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.checkout-item-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.checkout-item-placeholder {
+    font-size: 1.5rem;
+    opacity: 0.3;
+}
+
+.checkout-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.checkout-item-name {
+    font-weight: 600;
+}
+
+.checkout-item-qty {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.checkout-item-price {
+    font-weight: 700;
+    color: var(--accent-success);
+}
+
+.checkout-notice {
+    background: rgba(0, 217, 255, 0.1);
+    border: 1px solid var(--accent-primary);
+    border-radius: 12px;
+    padding: 1rem;
+    margin: 1.5rem 0;
+    color: var(--text-secondary);
+}
+
+.btn-submit {
+    width: 100%;
+    padding: 1.2rem;
+    font-size: 1.1rem;
+}
+
+.checkout-summary {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 2rem;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+}
+
+.checkout-summary h2 {
+    margin-bottom: 1.5rem;
+}
+
+.summary-items {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+}
+
+.delivery-info {
+    color: var(--accent-warning);
+    font-size: 0.9rem;
+}
+
+.summary-total {
+    display: flex;
+    justify-content: space-between;
+    padding: 1.5rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.summary-total span:last-child {
+    color: var(--accent-success);
+}
+
+.payment-methods {
+    margin-top: 1.5rem;
+}
+
+.payment-methods h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+
+.payment-option {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 1024px) {
+    .checkout-content {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

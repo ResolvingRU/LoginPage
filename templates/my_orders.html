@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Мои заказы - SaveVillage{% endblock %}
+
+{% block content %}
+<div class="orders-container">
+    <div class="orders-header">
+        <h1>📦 Мои заказы</h1>
+        <a href="{{ url_for('shop') }}" class="btn btn-secondary">← В магазин</a>
+    </div>
+
+    {% if orders %}
+    <div class="orders-list">
+        {% for order in orders %}
+        <div class="order-card">
+            <div class="order-header">
+                <div class="order-info">
+                    <h3>Заказ #{{ order.id }}</h3>
+                    <span class="order-date">{{ order.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                </div>
+                <div class="order-status-container">
+                    <span class="order-status status-{{ order.status }}">
+                        {% if order.status == 'pending' %}⏳ Ожидает подтверждения
+                        {% elif order.status == 'paid' %}💳 Оплачен
+                        {% elif order.status == 'shipped' %}🚚 Отправлен
+                        {% elif order.status == 'completed' %}✅ Выполнен
+                        {% elif order.status == 'cancelled' %}❌ Отменён
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <div class="order-items">
+                {% for item in order.items %}
+                <div class="order-item">
+                    <div class="order-item-image">
+                        {% if item.product_image %}
+                        <img src="{{ item.product_image }}" alt="{{ item.product_name }}">
+                        {% else %}
+                        <div class="order-item-placeholder">📦</div>
+                        {% endif %}
+                    </div>
+                    <div class="order-item-info">
+                        <span class="order-item-name">{{ item.product_name }}</span>
+                        <span class="order-item-price">{{ item.product_price }} ₽ × {{ item.quantity }}</span>
+                    </div>
+                    <span class="order-item-total">{{ (item.product_price * item.quantity)|round(2) }} ₽</span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="order-details">
+                <div class="order-detail-row">
+                    <span>📍 Адрес доставки:</span>
+                    <span>{{ order.delivery_address }}</span>
+                </div>
+                <div class="order-detail-row">
+                    <span>📞 Контакты:</span>
+                    <span>{{ order.contact_info }}</span>
+                </div>
+            </div>
+
+            <div class="order-footer">
+                <span class="order-total">Итого: <strong>{{ order.total_price|round(2) }} ₽</strong></span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-orders">
+        <div class="empty-icon">📦</div>
+        <h3>У вас пока нет заказов</h3>
+        <p>Оформите первый заказ в нашем магазине!</p>
+        <a href="{{ url_for('shop') }}" class="btn btn-primary">Перейти в магазин</a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.orders-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.orders-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.orders-header h1 {
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.order-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: all 0.3s;
+}
+
+.order-card:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.1);
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.order-info h3 {
+    margin-bottom: 0.25rem;
+    font-size: 1.2rem;
+}
+
+.order-date {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.order-status {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.status-pending {
+    background: rgba(255, 170, 0, 0.2);
+    color: var(--accent-warning);
+    border: 1px solid var(--accent-warning);
+}
+
+.status-paid {
+    background: rgba(0, 217, 255, 0.2);
+    color: var(--accent-primary);
+    border: 1px solid var(--accent-primary);
+}
+
+.status-shipped {
+    background: rgba(179, 0, 255, 0.2);
+    color: var(--accent-secondary);
+    border: 1px solid var(--accent-secondary);
+}
+
+.status-completed {
+    background: rgba(0, 255, 136, 0.2);
+    color: var(--accent-success);
+    border: 1px solid var(--accent-success);
+}
+
+.status-cancelled {
+    background: rgba(255, 0, 85, 0.2);
+    color: var(--accent-danger);
+    border: 1px solid var(--accent-danger);
+}
+
+.order-items {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.order-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.order-item-image {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.order-item-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.order-item-placeholder {
+    font-size: 2rem;
+    opacity: 0.3;
+}
+
+.order-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.order-item-name {
+    font-weight: 600;
+}
+
+.order-item-price {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.order-item-total {
+    font-weight: 700;
+    color: var(--accent-success);
+}
+
+.order-details {
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.order-detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    color: var(--text-secondary);
+}
+
+.order-detail-row span:first-child {
+    color: var(--text-muted);
+}
+
+.order-footer {
+    padding: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.order-total {
+    font-size: 1.3rem;
+}
+
+.order-total strong {
+    color: var(--accent-success);
+}
+
+.empty-orders {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-icon {
+    font-size: 5rem;
+    margin-bottom: 1rem;
+    opacity: 0.3;
+}
+
+.empty-orders h3 {
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.empty-orders p {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+    .order-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .order-detail-row {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+}
+</style>
+{% endblock %}
